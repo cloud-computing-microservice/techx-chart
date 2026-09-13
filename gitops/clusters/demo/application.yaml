@@ -8,7 +8,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/MinhKhoa2209/techx-chart.git
+    repoURL: https://github.com/cloud-computing-microservice/techx-chart.git
     targetRevision: main
     path: .
     helm:
