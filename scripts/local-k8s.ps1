@@ -7,7 +7,12 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$namespace = 'techx-demo'
+$namespace = 'techx-staging'
+$dynamoNamespace = 'techx-local-dependencies'
+$dynamoService = 'dynamodb-local'
+$dynamoPod = 'dynamodb-local-0'
+$dynamoImage = 'amazon/dynamodb-local:2.6.1'
+$awsCliImage = 'amazon/aws-cli:2.17.50'
 
 function Write-Diagnostic([string]$Message) {
   if ($DiagnosticLog) { "$(Get-Date -Format o) $Message" | Add-Content -LiteralPath $DiagnosticLog -Encoding utf8 }
@@ -28,6 +33,7 @@ function Assert-PodHttpDenied {
 if ($Action -eq 'Cleanup') {
   helm uninstall techx --namespace $namespace --ignore-not-found
   kubectl delete namespace $namespace --ignore-not-found --wait=true --timeout=120s
+  kubectl delete namespace $dynamoNamespace --ignore-not-found --wait=true --timeout=120s
   minikube delete --profile $Profile
   exit 0
 }
@@ -39,9 +45,73 @@ if (-not $status -or $status.Host -ne 'Running') {
 Write-Diagnostic 'cluster-ready'
 
 kubectl --context "${Profile}" create namespace $namespace --dry-run=client -o yaml | kubectl --context "${Profile}" apply -f -
+kubectl --context "${Profile}" create namespace $dynamoNamespace --dry-run=client -o yaml | kubectl --context "${Profile}" apply -f -
 kubectl --context "${Profile}" label namespace $namespace pod-security.kubernetes.io/enforce=restricted pod-security.kubernetes.io/warn=restricted pod-security.kubernetes.io/audit=restricted --overwrite
-kubectl --context "${Profile}" create secret generic techx-demo-secrets --namespace $namespace --from-literal=order-api-key='local-k8s-demo-key' --dry-run=client -o yaml | kubectl --context "${Profile}" apply -f -
-Write-Diagnostic 'namespace-secret-ready'
+kubectl --context "${Profile}" create secret generic techx-staging-secrets --namespace $namespace --from-literal=order-api-key='local-k8s-demo-key' --dry-run=client -o yaml | kubectl --context "${Profile}" apply -f -
+
+@"
+apiVersion: v1
+kind: Service
+metadata:
+  name: $dynamoService
+  namespace: $dynamoNamespace
+spec:
+  selector:
+    app: $dynamoService
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: $dynamoService
+  namespace: $dynamoNamespace
+spec:
+  serviceName: $dynamoService
+  replicas: 1
+  selector:
+    matchLabels:
+      app: $dynamoService
+  template:
+    metadata:
+      labels:
+        app: $dynamoService
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10000
+        runAsGroup: 10000
+        fsGroup: 10000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: dynamodb-local
+          image: $dynamoImage
+          args: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
+          ports:
+            - containerPort: 8000
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+"@ | kubectl --context $Profile apply -f -
+if ($LASTEXITCODE -ne 0) { throw 'Failed to create DynamoDB Local.' }
+kubectl --context $Profile --namespace $dynamoNamespace rollout status statefulset/$dynamoService --timeout=180s
+if ($LASTEXITCODE -ne 0) { throw 'DynamoDB Local did not become ready.' }
+kubectl --context $Profile --namespace $dynamoNamespace run dynamodb-bootstrap --rm --attach --restart=Never --image=$awsCliImage --env=AWS_ACCESS_KEY_ID=local --env=AWS_SECRET_ACCESS_KEY=local --env=AWS_DEFAULT_REGION=us-east-1 -- aws dynamodb create-table --endpoint-url "http://${dynamoService}:8000" --table-name techx-orders-local --attribute-definitions AttributeName=pk,AttributeType=S --key-schema AttributeName=pk,KeyType=HASH --billing-mode PAY_PER_REQUEST
+if ($LASTEXITCODE -ne 0) { throw 'Failed to bootstrap the local DynamoDB table.' }
+kubectl --context $Profile --namespace $dynamoNamespace run dynamodb-ttl-bootstrap --rm --attach --restart=Never --image=$awsCliImage --env=AWS_ACCESS_KEY_ID=local --env=AWS_SECRET_ACCESS_KEY=local --env=AWS_DEFAULT_REGION=us-east-1 -- aws dynamodb update-time-to-live --endpoint-url "http://${dynamoService}:8000" --table-name techx-orders-local --time-to-live-specification Enabled=true,AttributeName=ttlEpochSeconds
+if ($LASTEXITCODE -ne 0) { throw 'Failed to enable TTL on the local DynamoDB table.' }
+Write-Diagnostic 'namespace-secret-dynamodb-ready'
 
 foreach ($image in @('techx/frontend:local', 'techx/catalog:local', 'techx/order:local')) {
   if (-not (docker image inspect $image 2>$null)) {
@@ -137,7 +207,11 @@ try {
     $healthAfterRestart = Invoke-RestMethod -Uri 'http://127.0.0.1:18080/healthz' -TimeoutSec 10
     if ($healthAfterRestart.status -ne 'ok') { throw "Frontend did not recover after $deployment rollout." }
   }
-  Write-Diagnostic 'rollouts-ready'
+  $persistedOrder = Invoke-RestMethod -Uri "http://127.0.0.1:18080/api/orders/$($order.order.id)" -TimeoutSec 10
+  if ($persistedOrder.order.id -ne $order.order.id) { throw 'Order did not survive the Order API rollout.' }
+  $replay = Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:18080/api/orders' -ContentType 'application/json' -Headers @{ 'Idempotency-Key' = "local-k8s-$PID" } -Body $body -TimeoutSec 10
+  if ($replay.order.id -ne $order.order.id -or -not $replay.idempotentReplay) { throw 'Idempotency replay did not survive the Order API rollout.' }
+  Write-Diagnostic 'rollouts-persistence-ready'
 
   helm upgrade techx $root --namespace $namespace -f (Join-Path $root 'values-local.yaml') --set global.minReadySeconds=6 --kube-context $Profile --atomic --wait --timeout 5m
   if ($LASTEXITCODE -ne 0) { throw 'Helm upgrade failed.' }
@@ -154,7 +228,7 @@ try {
   }
   Write-Diagnostic 'resource-smoke-ready'
 
-  Write-Host "Local Kubernetes E2E passed with order $($order.order.id); full allow/deny matrix, all workload restarts, upgrade/rollback, probes, Secret, and no-restart/OOM resource smoke verified."
+  Write-Host "Local Kubernetes E2E passed with order $($order.order.id); DynamoDB-backed lookup/replay survived the Order API restart, and the full allow/deny matrix, upgrade/rollback, probes, Secret, and no-restart/OOM resource smoke were verified."
 }
 catch {
   Write-Diagnostic "ERROR: $($_.Exception.Message) at $($_.ScriptStackTrace)"
@@ -166,5 +240,6 @@ finally {
   Remove-Item -LiteralPath $forwardLog, "$forwardLog.err" -Force -ErrorAction SilentlyContinue
   helm uninstall techx --namespace $namespace --kube-context $Profile --ignore-not-found
   kubectl --context $Profile delete namespace $namespace --ignore-not-found --wait=true --timeout=120s
+  kubectl --context $Profile delete namespace $dynamoNamespace --ignore-not-found --wait=true --timeout=120s
   Write-Diagnostic "cleanup-complete lastExit=$LASTEXITCODE"
 }

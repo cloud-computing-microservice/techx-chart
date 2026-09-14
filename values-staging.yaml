@@ -1,0 +1,26 @@
+networkPolicy:
+  frontendIngressCidrs:
+    - 10.52.0.0/16
+workloads:
+  frontend:
+    image:
+      repository: 058114477594.dkr.ecr.us-east-1.amazonaws.com/techx/frontend
+      tag: staging-5608ef5aa5a7
+  catalog-api:
+    image:
+      repository: 058114477594.dkr.ecr.us-east-1.amazonaws.com/techx/catalog
+      tag: staging-5608ef5aa5a7
+  order-api:
+    serviceAccountAnnotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::058114477594:role/techx-staging-order-api
+      eks.amazonaws.com/sts-regional-endpoints: "true"
+    automountServiceAccountToken: true
+    image:
+      repository: 058114477594.dkr.ecr.us-east-1.amazonaws.com/techx/order
+      tag: staging-5608ef5aa5a7
+    env:
+      AWS_REGION: us-east-1
+      AWS_STS_REGIONAL_ENDPOINTS: regional
+      ORDER_TABLE_NAME: techx-staging-orders
+      ORDER_STORE_TTL_MS: "2592000000"
+      ORDER_IDEMPOTENCY_TTL_MS: "86400000"

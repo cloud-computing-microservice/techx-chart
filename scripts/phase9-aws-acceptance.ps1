@@ -10,8 +10,8 @@ param(
   [string]$ExpectedImageTag = '',
   [string]$Context = '',
   [string]$Region = 'us-east-1',
-  [string]$Namespace = 'techx-demo',
-  [string]$Application = 'techx-demo',
+  [string]$Namespace = 'techx-staging',
+  [string]$Application = 'techx-staging',
   [int]$TimeoutSeconds = 360
 )
 
@@ -106,8 +106,8 @@ function Assert-DomainVpnExposure {
   $vpn = Invoke-AwsJson @('ec2', 'describe-client-vpn-endpoints')
   $endpoints = @($vpn.ClientVpnEndpoints | Where-Object { $_.Status.Code -eq 'available' -and $_.DnsName })
   if ($endpoints.Count -ne 1) { throw "Expected one available Client VPN endpoint, found $($endpoints.Count)." }
-  if (@($endpoints[0].DnsServers) -notcontains '10.42.0.2' -or -not $endpoints[0].SplitTunnel) {
-    throw 'Client VPN must use split tunnel and the VPC resolver at 10.42.0.2.'
+  if (@($endpoints[0].DnsServers) -notcontains '10.52.0.2' -or -not $endpoints[0].SplitTunnel) {
+    throw 'Client VPN must use split tunnel and the VPC resolver at 10.52.0.2.'
   }
   $associations = Invoke-AwsJson @('ec2', 'describe-client-vpn-target-networks', '--client-vpn-endpoint-id', $endpoints[0].ClientVpnEndpointId)
   if ($associations.ClientVpnTargetNetworks.Count -ne 1 -or $associations.ClientVpnTargetNetworks[0].Status.Code -ne 'associated') {
@@ -115,7 +115,7 @@ function Assert-DomainVpnExposure {
   }
   $authorizations = Invoke-AwsJson @('ec2', 'describe-client-vpn-authorization-rules', '--client-vpn-endpoint-id', $endpoints[0].ClientVpnEndpointId)
   $vpcAuthorization = @($authorizations.AuthorizationRules | Where-Object {
-      $_.DestinationCidr -eq '10.42.0.0/16' -and $_.AccessAll -eq $true -and $_.Status.Code -eq 'active'
+      $_.DestinationCidr -eq '10.52.0.0/16' -and $_.AccessAll -eq $true -and $_.Status.Code -eq 'active'
     })
   if ($vpcAuthorization.Count -ne 1) { throw 'Client VPN does not have the expected active VPC authorization rule.' }
   $zones = Invoke-AwsJson @('route53', 'list-hosted-zones-by-name', '--dns-name', $publicHost)
@@ -136,7 +136,7 @@ function Assert-DomainVpnExposure {
   }
   else {
     $resolved = @(Resolve-DnsName -Name $publicHost -Type A -ErrorAction Stop | Where-Object { $_.IPAddress } | Select-Object -ExpandProperty IPAddress)
-    if ($resolved.Count -lt 1 -or @($resolved | Where-Object { $_ -notmatch '^10\.42\.' }).Count -gt 0) {
+    if ($resolved.Count -lt 1 -or @($resolved | Where-Object { $_ -notmatch '^10\.52\.' }).Count -gt 0) {
       throw "VPN split-view DNS did not return private VPC addresses: $($resolved -join ', ')."
     }
     $argo = Invoke-WebRequest -Uri "https://$publicHost/argocd/" -MaximumRedirection 0 -TimeoutSec 15 -SkipHttpErrorCheck
@@ -283,7 +283,7 @@ if ($Action -eq 'Baseline') {
   $nodes = Invoke-KubectlJson @('get', 'nodes')
   if ($nodes.items.Count -ne 1 -or $nodes.items[0].status.nodeInfo.operatingSystem -ne 'linux' -or
       $nodes.items[0].status.nodeInfo.architecture -ne 'amd64') {
-    throw 'The scoped demo must run on exactly one linux/amd64 node.'
+    throw 'The scoped staging environment must run on exactly one linux/amd64 node.'
   }
   foreach ($deployment in $deployments.items) {
     $pods = Invoke-KubectlJson @('-n', $Namespace, 'get', 'pods', '-l', "app.kubernetes.io/component=$($deployment.metadata.name)")

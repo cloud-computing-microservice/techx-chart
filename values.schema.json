@@ -4,18 +4,36 @@
   "additionalProperties": false,
   "required": ["global", "secret", "networkPolicy", "ingress", "workloads"],
   "properties": {
-    "nameOverride": {"type": "string"},
-    "fullnameOverride": {"type": "string"},
+    "nameOverride": { "type": "string" },
+    "fullnameOverride": { "type": "string" },
     "global": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["imagePullPolicy", "terminationGracePeriodSeconds", "minReadySeconds", "progressDeadlineSeconds", "revisionHistoryLimit"],
+      "required": [
+        "imagePullPolicy",
+        "terminationGracePeriodSeconds",
+        "minReadySeconds",
+        "progressDeadlineSeconds",
+        "revisionHistoryLimit"
+      ],
       "properties": {
-        "imagePullPolicy": {"enum": ["IfNotPresent", "Always", "Never"]},
-        "terminationGracePeriodSeconds": {"type": "integer", "minimum": 10, "maximum": 120},
-        "minReadySeconds": {"type": "integer", "minimum": 0, "maximum": 60},
-        "progressDeadlineSeconds": {"type": "integer", "minimum": 60, "maximum": 900},
-        "revisionHistoryLimit": {"type": "integer", "minimum": 1, "maximum": 10}
+        "imagePullPolicy": { "enum": ["IfNotPresent", "Always", "Never"] },
+        "terminationGracePeriodSeconds": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 120
+        },
+        "minReadySeconds": { "type": "integer", "minimum": 0, "maximum": 60 },
+        "progressDeadlineSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 900
+        },
+        "revisionHistoryLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        }
       }
     },
     "secret": {
@@ -23,33 +41,65 @@
       "additionalProperties": false,
       "required": ["name", "orderApiKeyKey"],
       "properties": {
-        "name": {"type": "string", "minLength": 1},
-        "orderApiKeyKey": {"type": "string", "minLength": 1}
+        "name": { "type": "string", "minLength": 1 },
+        "orderApiKeyKey": { "type": "string", "minLength": 1 }
       }
     },
     "networkPolicy": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "frontendIngressCidrs", "dnsNamespaceSelector", "dnsPodSelector"],
+      "required": [
+        "enabled",
+        "orderApiHttpsEgressEnabled",
+        "orderApiDynamoDbLocalEgressEnabled",
+        "frontendIngressCidrs",
+        "dnsNamespaceSelector",
+        "dnsPodSelector"
+      ],
       "properties": {
-        "enabled": {"type": "boolean"},
-        "frontendIngressCidrs": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[0-9.]+/[0-9]+$"}},
-        "dnsNamespaceSelector": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "string"}},
-        "dnsPodSelector": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "string"}}
+        "enabled": { "type": "boolean" },
+        "orderApiHttpsEgressEnabled": { "type": "boolean" },
+        "orderApiDynamoDbLocalEgressEnabled": { "type": "boolean" },
+        "frontendIngressCidrs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "^[0-9.]+/[0-9]+$" }
+        },
+        "dnsNamespaceSelector": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "type": "string" }
+        },
+        "dnsPodSelector": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "type": "string" }
+        }
       }
     },
     "ingress": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "profile", "className", "annotations", "path", "groupName", "groupOrder"],
+      "required": [
+        "enabled",
+        "profile",
+        "className",
+        "annotations",
+        "path",
+        "groupName",
+        "groupOrder"
+      ],
       "properties": {
-        "enabled": {"type": "boolean"},
-        "profile": {"enum": ["baseline", "domainVpn"]},
-        "className": {"type": "string", "minLength": 1},
-        "annotations": {"type": "object", "additionalProperties": {"type": "string"}},
-        "path": {"type": "string", "pattern": "^/"},
-        "groupName": {"type": "string", "minLength": 1},
-        "groupOrder": {"type": "integer", "minimum": 1, "maximum": 1000}
+        "enabled": { "type": "boolean" },
+        "profile": { "enum": ["baseline", "domainVpn"] },
+        "className": { "type": "string", "minLength": 1 },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "path": { "type": "string", "pattern": "^/" },
+        "groupName": { "type": "string", "minLength": 1 },
+        "groupOrder": { "type": "integer", "minimum": 1, "maximum": 1000 }
       }
     },
     "workloads": {
@@ -57,43 +107,90 @@
       "additionalProperties": false,
       "required": ["frontend", "catalog-api", "order-api"],
       "properties": {
-        "frontend": {"$ref": "#/$defs/workload"},
-        "catalog-api": {"$ref": "#/$defs/workload"},
-        "order-api": {"$ref": "#/$defs/workload"}
+        "frontend": { "$ref": "#/$defs/workload" },
+        "catalog-api": { "$ref": "#/$defs/workload" },
+        "order-api": { "$ref": "#/$defs/workload" }
       }
     }
   },
   "$defs": {
-    "quantity": {"oneOf": [{"type": "string", "pattern": "^[0-9]+m?$"}, {"type": "integer", "minimum": 1}]},
-    "memory": {"oneOf": [{"type": "string", "pattern": "^[0-9]+(Ki|Mi|Gi)$"}, {"type": "integer", "minimum": 1}]},
+    "quantity": {
+      "oneOf": [
+        { "type": "string", "pattern": "^[0-9]+m?$" },
+        { "type": "integer", "minimum": 1 }
+      ]
+    },
+    "memory": {
+      "oneOf": [
+        { "type": "string", "pattern": "^[0-9]+(Ki|Mi|Gi)$" },
+        { "type": "integer", "minimum": 1 }
+      ]
+    },
     "resources": {
       "type": "object",
       "additionalProperties": false,
       "required": ["requests", "limits"],
       "properties": {
-        "requests": {"type": "object", "additionalProperties": false, "required": ["cpu", "memory"], "properties": {"cpu": {"$ref": "#/$defs/quantity"}, "memory": {"$ref": "#/$defs/memory"}}},
-        "limits": {"type": "object", "additionalProperties": false, "required": ["cpu", "memory"], "properties": {"cpu": {"$ref": "#/$defs/quantity"}, "memory": {"$ref": "#/$defs/memory"}}}
+        "requests": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cpu", "memory"],
+          "properties": {
+            "cpu": { "$ref": "#/$defs/quantity" },
+            "memory": { "$ref": "#/$defs/memory" }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cpu", "memory"],
+          "properties": {
+            "cpu": { "$ref": "#/$defs/quantity" },
+            "memory": { "$ref": "#/$defs/memory" }
+          }
+        }
       }
     },
     "workload": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["image", "port", "replicas", "strategy", "resources", "env"],
+      "required": [
+        "serviceAccountAnnotations",
+        "automountServiceAccountToken",
+        "image",
+        "port",
+        "replicas",
+        "strategy",
+        "resources",
+        "env"
+      ],
       "properties": {
+        "serviceAccountAnnotations": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "automountServiceAccountToken": { "type": "boolean" },
         "image": {
           "type": "object",
           "additionalProperties": false,
           "required": ["repository", "tag"],
           "properties": {
-            "repository": {"type": "string", "minLength": 1},
-            "tag": {"type": "string", "minLength": 1, "not": {"enum": ["latest"]}}
+            "repository": { "type": "string", "minLength": 1 },
+            "tag": {
+              "type": "string",
+              "minLength": 1,
+              "not": { "enum": ["latest"] }
+            }
           }
         },
-        "port": {"type": "integer", "minimum": 1024, "maximum": 65535},
-        "replicas": {"type": "integer", "minimum": 1, "maximum": 1},
-        "strategy": {"enum": ["RollingUpdate", "Recreate"]},
-        "resources": {"$ref": "#/$defs/resources"},
-        "env": {"type": "object", "additionalProperties": {"type": "string"}}
+        "port": { "type": "integer", "minimum": 1024, "maximum": 65535 },
+        "replicas": { "type": "integer", "minimum": 1, "maximum": 1 },
+        "strategy": { "enum": ["RollingUpdate", "Recreate"] },
+        "resources": { "$ref": "#/$defs/resources" },
+        "env": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
       }
     }
   }

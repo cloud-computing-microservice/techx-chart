@@ -124,4 +124,19 @@ spec:
               app.kubernetes.io/component: catalog-api
       ports:
         - {protocol: TCP, port: {{ $catalog.port }}}
+    {{- if .Values.networkPolicy.orderApiHttpsEgressEnabled }}
+    - ports:
+        - {protocol: TCP, port: 443}
+    {{- end }}
+    {{- if .Values.networkPolicy.orderApiDynamoDbLocalEgressEnabled }}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: techx-local-dependencies
+          podSelector:
+            matchLabels:
+              app: dynamodb-local
+      ports:
+        - {protocol: TCP, port: 8000}
+    {{- end }}
 {{- end }}
