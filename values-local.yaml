@@ -1,6 +1,8 @@
 ingress:
   enabled: false
 networkPolicy:
+  orderApiHttpsEgressEnabled: false
+  orderApiDynamoDbLocalEgressEnabled: true
   frontendIngressCidrs:
     # Minikube Docker node range; test pods use the Calico pod range and must
     # not be treated as the external ingress source.
@@ -18,3 +20,10 @@ workloads:
     image:
       repository: techx/order
       tag: local
+    env:
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      ORDER_LOCAL_MODE: "true"
+      DYNAMODB_ENDPOINT: http://dynamodb-local.techx-local-dependencies.svc.cluster.local:8000
+      ORDER_TABLE_NAME: techx-orders-local

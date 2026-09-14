@@ -28,7 +28,7 @@ spec:
         {{- include "techx.selectorLabels" (dict "Chart" $.Chart "Values" $.Values "Release" $.Release "component" $name) | nindent 8 }}
     spec:
       serviceAccountName: {{ $name }}
-      automountServiceAccountToken: false
+      automountServiceAccountToken: {{ $config.automountServiceAccountToken }}
       terminationGracePeriodSeconds: {{ $.Values.global.terminationGracePeriodSeconds }}
       securityContext:
         runAsNonRoot: true
