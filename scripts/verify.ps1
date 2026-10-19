@@ -21,7 +21,7 @@ foreach ($marker in @(
     "'Baseline'", "'Resilience'", "'SelfHeal'", "'WaitRevision'",
     "'domainVpn'", "'Public'", "'Private'", 'cloudfront',
     'describe-client-vpn-endpoints', '/argocd/api/v1/session?probe=1',
-    'Idempotency-Key', 'NetworkPolicy', 'ORDER_NOT_FOUND'
+    'Idempotency-Key', 'NetworkPolicy', 'ORDER_PERSISTENCE_AFTER_RESTART'
   )) {
   if (-not $phase9Content.Contains($marker, [System.StringComparison]::Ordinal)) {
     throw "Phase 9 AWS acceptance script is missing required coverage marker: $marker"

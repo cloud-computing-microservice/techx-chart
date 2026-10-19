@@ -467,10 +467,18 @@ if ($Action -eq 'Resilience') {
   Wait-Deployment 'order-api'
   $lookup = Invoke-WebRequest -Uri "$baseUrl/api/orders/$orderId" -TimeoutSec 15 -SkipHttpErrorCheck
   $lookupBody = $lookup.Content | ConvertFrom-Json
-  if ($lookup.StatusCode -ne 404 -or $lookupBody.error.code -ne 'ORDER_NOT_FOUND') {
-    throw 'Order restart did not exhibit the documented in-memory ORDER_NOT_FOUND behavior.'
+  if ($lookup.StatusCode -ne 200 -or $lookupBody.order.id -ne $orderId) {
+    throw 'Order restart did not preserve the persisted order.'
   }
-  Write-Host "Phase 9 AWS resilience passed at $(Get-Date -Format o); double-submit, 429, request-ID, network allow/deny, Catalog 503/recovery, and Order restart verified."
+  $replay = Invoke-WebRequest -Method Post -Uri "$baseUrl/api/orders" `
+    -Headers @{ 'Idempotency-Key' = $idempotencyKey } `
+    -ContentType 'application/json' -Body $body -TimeoutSec 15 -SkipHttpErrorCheck
+  $replayBody = $replay.Content | ConvertFrom-Json
+  if ($replay.StatusCode -ne 200 -or $replayBody.order.id -ne $orderId) {
+    throw 'Idempotent replay after Order restart did not return the persisted order.'
+  }
+  Write-Host "ORDER_PERSISTENCE_AFTER_RESTART passed: lookup and idempotent replay retained order $orderId."
+  Write-Host "Phase 9 AWS resilience passed at $(Get-Date -Format o); double-submit, 429, request-ID, network allow/deny, Catalog 503/recovery, and Order persistence verified."
   exit 0
 }
 
