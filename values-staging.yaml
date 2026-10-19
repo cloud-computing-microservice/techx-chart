@@ -5,11 +5,11 @@ workloads:
   frontend:
     image:
       repository: 058114477594.dkr.ecr.us-east-1.amazonaws.com/techx/frontend
-      tag: staging-7a0a2d2cafa2
+      tag: staging-fcf1d6edaffb
   catalog-api:
     image:
       repository: 058114477594.dkr.ecr.us-east-1.amazonaws.com/techx/catalog
-      tag: staging-7a0a2d2cafa2
+      tag: staging-fcf1d6edaffb
   order-api:
     serviceAccountAnnotations:
       eks.amazonaws.com/role-arn: arn:aws:iam::058114477594:role/techx-staging-order-api
@@ -17,7 +17,7 @@ workloads:
     automountServiceAccountToken: true
     image:
       repository: 058114477594.dkr.ecr.us-east-1.amazonaws.com/techx/order
-      tag: staging-7a0a2d2cafa2
+      tag: staging-fcf1d6edaffb
     env:
       AWS_REGION: us-east-1
       AWS_STS_REGIONAL_ENDPOINTS: regional
