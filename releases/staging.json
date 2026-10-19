@@ -1,0 +1,21 @@
+{
+  "commit": "ccb6e215caad3cd1790607a77ccc2c66cef67e30",
+  "tag": "staging-ccb6e215caad",
+  "images": [
+    {
+      "component": "frontend",
+      "image": "058114477594.dkr.ecr.us-east-1.amazonaws.com/techx/frontend:staging-ccb6e215caad",
+      "digest": "sha256:538e2f05bc00898ae2cc70055339d309637375f2f7cf50776ad2489ee7175bf4"
+    },
+    {
+      "component": "catalog",
+      "image": "058114477594.dkr.ecr.us-east-1.amazonaws.com/techx/catalog:staging-ccb6e215caad",
+      "digest": "sha256:92a4c523f796c426fa5a7259ab7541b3826df733399bc9ef40ae5146ec4ea9b3"
+    },
+    {
+      "component": "order",
+      "image": "058114477594.dkr.ecr.us-east-1.amazonaws.com/techx/order:staging-ccb6e215caad",
+      "digest": "sha256:08c4dbc34a35e5226cfd16cbc23e99dd1620ea87dc7fbe73d1f5197aa0c04535"
+    }
+  ]
+}
