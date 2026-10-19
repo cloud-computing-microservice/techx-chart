@@ -84,8 +84,8 @@ function Assert-DomainVpnExposure {
   if ($targetGroups.TargetGroups.Count -lt 2) { throw 'The shared ALB must have frontend and Argo CD target groups.' }
   foreach ($targetGroup in $targetGroups.TargetGroups) {
     $targetHealth = Invoke-AwsJson @('elbv2', 'describe-target-health', '--target-group-arn', $targetGroup.TargetGroupArn)
-    if ($targetHealth.TargetHealthDescriptions.Count -lt 1 -or
-        @($targetHealth.TargetHealthDescriptions | Where-Object { $_.TargetHealth.State -ne 'healthy' }).Count -gt 0) {
+    if (@($targetHealth.TargetHealthDescriptions | Where-Object { $_.TargetHealth.State -eq 'healthy' }).Count -lt 1 -or
+        @($targetHealth.TargetHealthDescriptions | Where-Object { $_.TargetHealth.State -notin @('healthy', 'draining') }).Count -gt 0) {
       throw "ALB target group $($targetGroup.TargetGroupName) is not fully healthy."
     }
   }
@@ -291,6 +291,10 @@ if ($Action -eq 'Baseline') {
     $activePods = @($pods.items | Where-Object { -not $_.metadata.deletionTimestamp })
     if ($activePods.Count -ne 1) { throw "$($deployment.metadata.name) does not own exactly one active pod." }
     foreach ($pod in $activePods) {
+      if ($ExposureProfile -eq 'domainVpn' -and $deployment.metadata.name -eq 'frontend') {
+        $targetGates = @($pod.status.conditions | Where-Object { $_.type -like 'target-health.elbv2.k8s.aws/*' -and $_.status -eq 'True' })
+        if ($targetGates.Count -lt 1) { throw 'Frontend has no healthy ALB target readiness gate.' }
+      }
       if ($pod.spec.securityContext.runAsNonRoot -ne $true -or $pod.spec.securityContext.seccompProfile.type -ne 'RuntimeDefault') {
         throw "$($pod.metadata.name) does not use the required pod security context."
       }
@@ -333,8 +337,8 @@ if ($Action -eq 'Baseline') {
     $targetGroups = Invoke-AwsJson @('elbv2', 'describe-target-groups', '--load-balancer-arn', $loadBalancer[0].LoadBalancerArn)
     if ($targetGroups.TargetGroups.Count -ne 1) { throw 'The public ALB must have exactly one target group.' }
     $targetHealth = Invoke-AwsJson @('elbv2', 'describe-target-health', '--target-group-arn', $targetGroups.TargetGroups[0].TargetGroupArn)
-    if ($targetHealth.TargetHealthDescriptions.Count -lt 1 -or
-        @($targetHealth.TargetHealthDescriptions | Where-Object { $_.TargetHealth.State -ne 'healthy' }).Count -gt 0) {
+    if (@($targetHealth.TargetHealthDescriptions | Where-Object { $_.TargetHealth.State -eq 'healthy' }).Count -lt 1 -or
+        @($targetHealth.TargetHealthDescriptions | Where-Object { $_.TargetHealth.State -notin @('healthy', 'draining') }).Count -gt 0) {
       throw 'The frontend ALB target group is not fully healthy.'
     }
   }

@@ -35,6 +35,8 @@ ingress:
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
     alb.ingress.kubernetes.io/healthcheck-path: /healthz
     alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
     alb.ingress.kubernetes.io/success-codes: "200"
     alb.ingress.kubernetes.io/load-balancer-attributes: deletion_protection.enabled=false
     alb.ingress.kubernetes.io/tags: Project=techx,Environment=staging,ManagedBy=kubernetes

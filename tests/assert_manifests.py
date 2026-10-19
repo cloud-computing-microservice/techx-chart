@@ -39,6 +39,8 @@ require(paths[0]["path"] == "/", "Ingress must only expose the root prefix")
 require(paths[0]["backend"]["service"]["name"] == "frontend", "Ingress must only target frontend")
 require(ingress["spec"]["ingressClassName"] == "alb", "staging Ingress must use ALB")
 annotations = ingress["metadata"]["annotations"]
+require(annotations.get("alb.ingress.kubernetes.io/healthcheck-interval-seconds") == "5", "frontend ALB health interval must be five seconds")
+require(annotations.get("alb.ingress.kubernetes.io/healthy-threshold-count") == "2", "frontend ALB must require two healthy probes")
 if profile == "baseline":
     require(annotations["alb.ingress.kubernetes.io/scheme"] == "internet-facing", "baseline ALB must be public")
     require(annotations["alb.ingress.kubernetes.io/listen-ports"] == '[{"HTTP":80}]', "baseline listener mismatch")
@@ -109,5 +111,6 @@ require(app["spec"]["source"]["helm"]["valueFiles"] == ["values-staging.yaml", "
 require(app["spec"]["syncPolicy"]["automated"] == {"prune": True, "selfHeal": True, "allowEmpty": False}, "Argo automated sync mismatch")
 require("resources-finalizer.argocd.argoproj.io" in app["metadata"]["finalizers"], "Argo finalizer missing")
 require("CreateNamespace=true" in app["spec"]["syncPolicy"]["syncOptions"], "Argo namespace creation missing")
+require(app["spec"]["syncPolicy"]["managedNamespaceMetadata"]["labels"].get("elbv2.k8s.aws/pod-readiness-gate-inject") == "enabled", "ALB target readiness injection must survive namespace reconciliation")
 
 print("Helm manifest and Argo CD assertions passed.")

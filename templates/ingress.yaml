@@ -14,6 +14,8 @@ metadata:
     alb.ingress.kubernetes.io/group.order: {{ .Values.ingress.groupOrder | quote }}
     alb.ingress.kubernetes.io/healthcheck-path: /healthz
     alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: {{ index .Values.ingress.annotations "alb.ingress.kubernetes.io/healthcheck-interval-seconds" | quote }}
+    alb.ingress.kubernetes.io/healthy-threshold-count: {{ index .Values.ingress.annotations "alb.ingress.kubernetes.io/healthy-threshold-count" | quote }}
     alb.ingress.kubernetes.io/success-codes: "200"
     {{- else }}
     {{- toYaml .Values.ingress.annotations | nindent 4 }}
