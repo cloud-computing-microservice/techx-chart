@@ -75,7 +75,8 @@ for deployment in by_kind["Deployment"]:
     require(container["livenessProbe"]["httpGet"]["path"] == "/healthz", f"{name} liveness probe mismatch")
     require(container["readinessProbe"]["httpGet"]["path"] == "/readyz", f"{name} readiness probe mismatch")
     require(container["resources"]["requests"] and container["resources"]["limits"], f"{name} resources missing")
-    require(spec["strategy"]["type"] == ("Recreate" if name == "order-api" else "RollingUpdate"), f"{name} rollout strategy mismatch")
+    require(spec["strategy"]["type"] == "RollingUpdate", f"{name} must keep serving during rollout")
+    require(spec["strategy"]["rollingUpdate"] == {"maxSurge": 1, "maxUnavailable": 0}, f"{name} rollout availability mismatch")
     env = {item["name"]: item.get("value") for item in container["env"] if "value" in item}
     if name == "order-api":
         expected_env = {

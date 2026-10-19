@@ -6,7 +6,7 @@ foreach ($path in @('.gitignore', 'LICENSE', 'README.md')) {
   }
 }
 
-$phase9Script = Join-Path $PSScriptRoot 'phase9-aws-acceptance.ps1'
+$phase9Script = Join-Path $PSScriptRoot 'aws-acceptance.ps1'
 if (-not (Test-Path -LiteralPath $phase9Script)) {
   throw 'Missing Phase 9 AWS acceptance script.'
 }
@@ -21,7 +21,7 @@ foreach ($marker in @(
     "'Baseline'", "'Resilience'", "'SelfHeal'", "'WaitRevision'",
     "'domainVpn'", "'Public'", "'Private'", 'cloudfront',
     'describe-client-vpn-endpoints', '/argocd/api/v1/session?probe=1',
-    'Idempotency-Key', 'NetworkPolicy', 'ORDER_NOT_FOUND'
+    'Idempotency-Key', 'NetworkPolicy', 'ORDER_PERSISTENCE_AFTER_RESTART'
   )) {
   if (-not $phase9Content.Contains($marker, [System.StringComparison]::Ordinal)) {
     throw "Phase 9 AWS acceptance script is missing required coverage marker: $marker"
@@ -30,6 +30,7 @@ foreach ($marker in @(
 
 & (Join-Path $PSScriptRoot 'test-chart.ps1')
 & (Join-Path $PSScriptRoot 'evidence-audit.ps1')
+& (Join-Path $PSScriptRoot 'test-local-cleanup.ps1')
 
 $forbidden = git ls-files | Select-String -Pattern '(^|/)(\.env$|rendered/)|\.(tfstate|tfplan)$'
 if ($forbidden) {

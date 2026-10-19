@@ -1,7 +1,7 @@
 param(
   [ValidateSet('Test', 'Cleanup')]
   [string]$Action = 'Test',
-  [string]$Profile = 'techx-local',
+  [ValidatePattern('^techx-local(?:-[a-z0-9-]+)?$')][string]$Profile = 'techx-local',
   [string]$DiagnosticLog = ''
 )
 
@@ -31,10 +31,14 @@ function Assert-PodHttpDenied {
 }
 
 if ($Action -eq 'Cleanup') {
-  helm uninstall techx --namespace $namespace --ignore-not-found
-  kubectl delete namespace $namespace --ignore-not-found --wait=true --timeout=120s
-  kubectl delete namespace $dynamoNamespace --ignore-not-found --wait=true --timeout=120s
+  helm --kube-context $Profile uninstall techx --namespace $namespace --ignore-not-found
+  if ($LASTEXITCODE -ne 0) { throw 'Could not uninstall the local chart.' }
+  kubectl --context $Profile delete namespace $namespace --ignore-not-found --wait=true --timeout=120s
+  if ($LASTEXITCODE -ne 0) { throw 'Could not remove the local workload namespace.' }
+  kubectl --context $Profile delete namespace $dynamoNamespace --ignore-not-found --wait=true --timeout=120s
+  if ($LASTEXITCODE -ne 0) { throw 'Could not remove the local dependency namespace.' }
   minikube delete --profile $Profile
+  if ($LASTEXITCODE -ne 0) { throw 'Could not remove the local minikube profile.' }
   exit 0
 }
 

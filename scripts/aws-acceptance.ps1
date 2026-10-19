@@ -2,7 +2,7 @@ param(
   [ValidateSet('Baseline', 'Resilience', 'SelfHeal', 'WaitRevision')]
   [string]$Action = 'Baseline',
   [ValidateSet('baseline', 'domainVpn')]
-  [string]$ExposureProfile = 'baseline',
+  [string]$ExposureProfile = 'domainVpn',
   [ValidateSet('Public', 'Private')]
   [string]$NetworkView = 'Public',
   [string]$PublicUrl = '',
@@ -205,9 +205,10 @@ function Assert-EcrArtifacts([string]$Tag) {
       throw "ECR scan is not COMPLETE with zero CRITICAL findings for ${repository}:$Tag."
     }
     $pods = Invoke-KubectlJson @('-n', $Namespace, 'get', 'pods', '-l', "app.kubernetes.io/component=$($deployment.metadata.name)")
-    $imageIds = @($pods.items.status.containerStatuses.imageID)
-    if ($imageIds.Count -lt 1 -or @($imageIds | Where-Object { $_ -notmatch '@sha256:[0-9a-f]{64}$' }).Count -gt 0) {
-      throw "$($deployment.metadata.name) did not report immutable runtime image IDs."
+    $activePods = @($pods.items | Where-Object { -not $_.metadata.deletionTimestamp })
+    $imageIds = @($activePods.status.containerStatuses.imageID)
+    if ($imageIds.Count -lt 1 -or @($imageIds | Where-Object { -not $_.EndsWith("@$digest", [StringComparison]::Ordinal) }).Count -gt 0) {
+      throw "$($deployment.metadata.name) runtime image digest does not match the ECR artifact."
     }
     Write-Host "$($deployment.metadata.name) artifact verified: ${repository}:$Tag ECR=$digest runtime=$($imageIds -join ',')"
   }
@@ -287,8 +288,9 @@ if ($Action -eq 'Baseline') {
   }
   foreach ($deployment in $deployments.items) {
     $pods = Invoke-KubectlJson @('-n', $Namespace, 'get', 'pods', '-l', "app.kubernetes.io/component=$($deployment.metadata.name)")
-    if ($pods.items.Count -ne 1) { throw "$($deployment.metadata.name) does not own exactly one pod." }
-    foreach ($pod in $pods.items) {
+    $activePods = @($pods.items | Where-Object { -not $_.metadata.deletionTimestamp })
+    if ($activePods.Count -ne 1) { throw "$($deployment.metadata.name) does not own exactly one active pod." }
+    foreach ($pod in $activePods) {
       if ($pod.spec.securityContext.runAsNonRoot -ne $true -or $pod.spec.securityContext.seccompProfile.type -ne 'RuntimeDefault') {
         throw "$($pod.metadata.name) does not use the required pod security context."
       }
@@ -359,7 +361,7 @@ if ($Action -eq 'Baseline') {
   if (($canAdmin -join '').Trim() -ne 'no') {
     throw 'Frontend ServiceAccount unexpectedly has Kubernetes API permissions.'
   }
-  Write-Host "Phase 9 AWS baseline passed at $(Get-Date -Format o); profile=$ExposureProfile; view=$NetworkView; revision=$($app.status.sync.revision); exposure and request-ID correlation verified."
+  Write-Host "AWS baseline passed at $(Get-Date -Format o); profile=$ExposureProfile; view=$NetworkView; revision=$($app.status.sync.revision); exposure and request-ID correlation verified."
   exit 0
 }
 
@@ -429,19 +431,19 @@ if ($Action -eq 'Resilience') {
       })
     }
   } | ConvertTo-Json -Depth 8 -Compress
-  & kubectl @kubectlContext -n $Namespace delete pod phase9-network-deny --ignore-not-found --wait=false *> $null
+  & kubectl @kubectlContext -n $Namespace delete pod techx-network-deny --ignore-not-found --wait=false *> $null
   try {
-    & kubectl @kubectlContext -n $Namespace run phase9-network-deny --image=$testImage --restart=Never --overrides=$denyOverrides --command -- node -e 'setTimeout(() => {}, 300000)'
+    & kubectl @kubectlContext -n $Namespace run techx-network-deny --image=$testImage --restart=Never --overrides=$denyOverrides --command -- node -e 'setTimeout(() => {}, 300000)'
     if ($LASTEXITCODE -ne 0) { throw 'Could not create the restricted untrusted test pod.' }
-    & kubectl @kubectlContext -n $Namespace wait --for=condition=Ready pod/phase9-network-deny --timeout="${TimeoutSeconds}s"
+    & kubectl @kubectlContext -n $Namespace wait --for=condition=Ready pod/techx-network-deny --timeout="${TimeoutSeconds}s"
     if ($LASTEXITCODE -ne 0) { throw 'The restricted untrusted test pod did not become Ready.' }
     foreach ($url in @('http://catalog-api:3001/healthz', 'http://order-api:3002/healthz')) {
-      & kubectl @kubectlContext -n $Namespace exec phase9-network-deny -- node -e "fetch('$url',{signal:AbortSignal.timeout(4000)}).then(()=>process.exit(0)).catch(()=>process.exit(1))" 2>$null
+      & kubectl @kubectlContext -n $Namespace exec techx-network-deny -- node -e "fetch('$url',{signal:AbortSignal.timeout(4000)}).then(()=>process.exit(0)).catch(()=>process.exit(1))" 2>$null
       if ($LASTEXITCODE -eq 0) { throw "NetworkPolicy allowed the untrusted pod to reach $url." }
     }
   }
   finally {
-    & kubectl @kubectlContext -n $Namespace delete pod phase9-network-deny --ignore-not-found --wait=false *> $null
+    & kubectl @kubectlContext -n $Namespace delete pod techx-network-deny --ignore-not-found --wait=false *> $null
   }
 
   & kubectl @kubectlContext -n $Namespace scale deployment/catalog-api --replicas=0
@@ -467,10 +469,18 @@ if ($Action -eq 'Resilience') {
   Wait-Deployment 'order-api'
   $lookup = Invoke-WebRequest -Uri "$baseUrl/api/orders/$orderId" -TimeoutSec 15 -SkipHttpErrorCheck
   $lookupBody = $lookup.Content | ConvertFrom-Json
-  if ($lookup.StatusCode -ne 404 -or $lookupBody.error.code -ne 'ORDER_NOT_FOUND') {
-    throw 'Order restart did not exhibit the documented in-memory ORDER_NOT_FOUND behavior.'
+  if ($lookup.StatusCode -ne 200 -or $lookupBody.order.id -ne $orderId) {
+    throw 'Order restart did not preserve the persisted order.'
   }
-  Write-Host "Phase 9 AWS resilience passed at $(Get-Date -Format o); double-submit, 429, request-ID, network allow/deny, Catalog 503/recovery, and Order restart verified."
+  $replay = Invoke-WebRequest -Method Post -Uri "$baseUrl/api/orders" `
+    -Headers @{ 'Idempotency-Key' = $idempotencyKey } `
+    -ContentType 'application/json' -Body $body -TimeoutSec 15 -SkipHttpErrorCheck
+  $replayBody = $replay.Content | ConvertFrom-Json
+  if ($replay.StatusCode -ne 200 -or $replayBody.order.id -ne $orderId) {
+    throw 'Idempotent replay after Order restart did not return the persisted order.'
+  }
+  Write-Host "ORDER_PERSISTENCE_AFTER_RESTART passed: lookup and idempotent replay retained order $orderId."
+  Write-Host "AWS resilience passed at $(Get-Date -Format o); double-submit, 429, request-ID, network allow/deny, Catalog 503/recovery, and Order persistence verified."
   exit 0
 }
 

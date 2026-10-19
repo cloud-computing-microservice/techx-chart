@@ -38,16 +38,16 @@ checks in this order. The script never changes Git or pushes an image; those
 auditable changes remain explicit operator steps:
 
 ```powershell
-./scripts/phase9-aws-acceptance.ps1 -Action Baseline -ExposureProfile domainVpn -NetworkView Public -PublicUrl 'https://shop.dinhminhkhoa.id.vn/'
-./scripts/phase9-aws-acceptance.ps1 -Action Baseline -ExposureProfile domainVpn -NetworkView Private -PublicUrl 'https://shop.dinhminhkhoa.id.vn/'
-./scripts/phase9-aws-acceptance.ps1 -Action Resilience -ExposureProfile domainVpn -PublicUrl 'https://shop.dinhminhkhoa.id.vn/'
-./scripts/phase9-aws-acceptance.ps1 -Action SelfHeal
+./scripts/aws-acceptance.ps1 -Action Baseline -ExposureProfile domainVpn -NetworkView Public -PublicUrl 'https://shop.dinhminhkhoa.id.vn/'
+./scripts/aws-acceptance.ps1 -Action Baseline -ExposureProfile domainVpn -NetworkView Private -PublicUrl 'https://shop.dinhminhkhoa.id.vn/'
+./scripts/aws-acceptance.ps1 -Action Resilience -ExposureProfile domainVpn -PublicUrl 'https://shop.dinhminhkhoa.id.vn/'
+./scripts/aws-acceptance.ps1 -Action SelfHeal
 
 # Push the reviewed values-staging.yaml commit that selects the candidate immutable tag.
-./scripts/phase9-aws-acceptance.ps1 -Action WaitRevision -ExpectedRevision '<candidate-chart-sha>' -ExpectedImageTag 'staging-<candidate-sha>'
+./scripts/aws-acceptance.ps1 -Action WaitRevision -ExpectedRevision '<candidate-chart-sha>' -ExpectedImageTag 'staging-<candidate-sha>'
 
 # git revert <candidate-chart-sha>, review the diff, and push the revert.
-./scripts/phase9-aws-acceptance.ps1 -Action WaitRevision -ExpectedRevision '<revert-chart-sha>' -ExpectedImageTag 'staging-<baseline-sha>'
+./scripts/aws-acceptance.ps1 -Action WaitRevision -ExpectedRevision '<revert-chart-sha>' -ExpectedImageTag 'staging-<baseline-sha>'
 ```
 
 The public `Baseline` proves CloudFront HTTPS, VPC origin use, public
@@ -62,7 +62,8 @@ recovery, and DynamoDB-backed Order persistence after a pod restart. `SelfHeal` 
 controlled replica drift and waits for convergence. `WaitRevision` ties candidate
 and revert evidence to an exact Git revision, immutable ECR tag/digest, completed
 zero-critical scan, and runtime image IDs. Run this only while the approved staging
-environment exists; every new apply still requires fresh owner confirmation.
+environment exists; infrastructure changes use the account/checksum/cost/deadline
+reviewed deployment runner in `techx-infra`.
 
 The repository verifier also runs `scripts/evidence-audit.ps1`, which rejects
 tracked state/key artifacts and common credential patterns and requires every

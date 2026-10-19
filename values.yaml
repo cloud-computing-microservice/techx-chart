@@ -88,7 +88,7 @@ workloads:
       tag: staging-placeholder
     port: 3002
     replicas: 1
-    strategy: Recreate
+    strategy: RollingUpdate
     resources:
       requests:
         cpu: 100m
