@@ -43,6 +43,9 @@ require(paths[0]["backend"]["service"]["name"] == "frontend", "Ingress must only
 require(ingress["spec"]["ingressClassName"] == "alb", "staging Ingress must use ALB")
 annotations = ingress["metadata"]["annotations"]
 require(annotations.get("alb.ingress.kubernetes.io/healthcheck-interval-seconds") == "5", "frontend ALB health interval must be five seconds")
+health_timeout = int(annotations.get("alb.ingress.kubernetes.io/healthcheck-timeout-seconds", "5"))
+health_interval = int(annotations["alb.ingress.kubernetes.io/healthcheck-interval-seconds"])
+require(1 <= health_timeout < health_interval, "ALB health timeout must be positive and smaller than its interval, including on a fresh target group")
 require(annotations.get("alb.ingress.kubernetes.io/healthy-threshold-count") == "2", "frontend ALB must require two healthy probes")
 if profile == "baseline":
     require(annotations["alb.ingress.kubernetes.io/scheme"] == "internet-facing", "baseline ALB must be public")
