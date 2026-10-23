@@ -1,21 +1,21 @@
 {
-  "commit": "9631c06daaa8395f96eff00f455d163a25e95597",
-  "tag": "staging-9631c06daaa8",
+  "commit": "d497e00ff00441002d71159518b272fa49daea90",
+  "tag": "staging-d497e00ff004",
   "images": [
     {
       "component": "frontend",
-      "image": "058114477594.dkr.ecr.us-east-1.amazonaws.com/techx/frontend:staging-9631c06daaa8",
-      "digest": "sha256:7ee52412e3e54da1f749f6d29c92245b7bba69efe975bf6761604ad1f5a2154c"
+      "image": "058114477594.dkr.ecr.us-east-1.amazonaws.com/techx/frontend:staging-d497e00ff004",
+      "digest": "sha256:04ea44656bb1f8104b6389288979b8b04d5937cbd1617d79827c4799219cdbfa"
     },
     {
       "component": "catalog",
-      "image": "058114477594.dkr.ecr.us-east-1.amazonaws.com/techx/catalog:staging-9631c06daaa8",
-      "digest": "sha256:152fa4f10ec8d1acbcb7d400922315ef47d8d9aecbdae2c6b3caeced6f26cd9e"
+      "image": "058114477594.dkr.ecr.us-east-1.amazonaws.com/techx/catalog:staging-d497e00ff004",
+      "digest": "sha256:b3196954f2e3d3c725e19dd50a3ce78cd77f3a1e46f675de3d1b0ff7e64e745d"
     },
     {
       "component": "order",
-      "image": "058114477594.dkr.ecr.us-east-1.amazonaws.com/techx/order:staging-9631c06daaa8",
-      "digest": "sha256:041dfbc6ec7ed91d1e9f787e7b00fd625c0c4d6d1b3d3cb08289954fc3355a56"
+      "image": "058114477594.dkr.ecr.us-east-1.amazonaws.com/techx/order:staging-d497e00ff004",
+      "digest": "sha256:b5436ad613fcd0c14bf9c190129229cc57c095b4118cde8fee8355fbf3f236b1"
     }
   ]
 }
