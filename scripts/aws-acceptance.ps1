@@ -125,7 +125,7 @@ function Assert-DomainVpnExposure {
   if ($privateZones.Count -ne 1) { throw "Expected one private hosted zone for $publicHost." }
 
   if ($NetworkView -eq 'Public') {
-    $resolved = @(Resolve-DnsName -Name $publicHost -Type A -ErrorAction Stop | Where-Object { $_.IPAddress } | Select-Object -ExpandProperty IPAddress)
+    $resolved = @([System.Net.Dns]::GetHostAddresses($publicHost) | Where-Object { $_.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork } | ForEach-Object { $_.IPAddressToString })
     if ($resolved.Count -lt 1 -or @($resolved | Where-Object { $_ -match '^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)' }).Count -gt 0) {
       throw "Public DNS unexpectedly returned a private address: $($resolved -join ', ')."
     }
@@ -135,7 +135,7 @@ function Assert-DomainVpnExposure {
     }
   }
   else {
-    $resolved = @(Resolve-DnsName -Name $publicHost -Type A -ErrorAction Stop | Where-Object { $_.IPAddress } | Select-Object -ExpandProperty IPAddress)
+    $resolved = @([System.Net.Dns]::GetHostAddresses($publicHost) | Where-Object { $_.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork } | ForEach-Object { $_.IPAddressToString })
     if ($resolved.Count -lt 1 -or @($resolved | Where-Object { $_ -notmatch '^10\.52\.' }).Count -gt 0) {
       throw "VPN split-view DNS did not return private VPC addresses: $($resolved -join ', ')."
     }
@@ -169,50 +169,7 @@ function Wait-Argo([string]$RevisionPrefix = '') {
   throw "Argo CD did not converge to Synced/Healthy revision '$RevisionPrefix' within $TimeoutSeconds seconds."
 }
 
-function Assert-ImageTag([string]$Tag) {
-  if (-not $Tag) { return }
-  $deployments = Invoke-KubectlJson @('-n', $Namespace, 'get', 'deployments')
-  foreach ($deployment in $deployments.items) {
-    $images = @($deployment.spec.template.spec.containers.image)
-    if ($images.Count -ne 1 -or $images[0] -notmatch ":$([regex]::Escape($Tag))$") {
-      throw "$($deployment.metadata.name) does not run expected immutable tag $Tag."
-    }
-  }
-}
-
-function Assert-EcrArtifacts([string]$Tag) {
-  if (-not $Tag) { return }
-  $deployments = Invoke-KubectlJson @('-n', $Namespace, 'get', 'deployments')
-  foreach ($deployment in $deployments.items) {
-    $image = [string]$deployment.spec.template.spec.containers[0].image
-    if ($image -notmatch '^[0-9]+\.dkr\.ecr\.[^.]+\.amazonaws\.com/([^:]+):(.+)$') {
-      throw "$($deployment.metadata.name) does not use an ECR tag reference."
-    }
-    $repository = $Matches[1]
-    $actualTag = $Matches[2]
-    if ($actualTag -ne $Tag) { throw "$($deployment.metadata.name) tag $actualTag does not match $Tag." }
-    $repositoryDetails = Invoke-AwsJson @('ecr', 'describe-repositories', '--repository-names', $repository)
-    if ($repositoryDetails.repositories.Count -ne 1 -or $repositoryDetails.repositories[0].imageTagMutability -ne 'IMMUTABLE') {
-      throw "ECR repository $repository is not immutable."
-    }
-    $details = Invoke-AwsJson @('ecr', 'describe-images', '--repository-name', $repository, '--image-ids', "imageTag=$Tag")
-    if ($details.imageDetails.Count -ne 1 -or -not $details.imageDetails[0].imageDigest) {
-      throw "ECR did not return one immutable digest for ${repository}:$Tag."
-    }
-    $digest = [string]$details.imageDetails[0].imageDigest
-    $scan = Invoke-AwsJson @('ecr', 'describe-image-scan-findings', '--repository-name', $repository, '--image-id', "imageTag=$Tag")
-    if ($scan.imageScanStatus.status -ne 'COMPLETE' -or [int]($scan.imageScanFindings.findingSeverityCounts.CRITICAL ?? 0) -ne 0) {
-      throw "ECR scan is not COMPLETE with zero CRITICAL findings for ${repository}:$Tag."
-    }
-    $pods = Invoke-KubectlJson @('-n', $Namespace, 'get', 'pods', '-l', "app.kubernetes.io/component=$($deployment.metadata.name)")
-    $activePods = @($pods.items | Where-Object { -not $_.metadata.deletionTimestamp })
-    $imageIds = @($activePods.status.containerStatuses.imageID)
-    if ($imageIds.Count -lt 1 -or @($imageIds | Where-Object { -not $_.EndsWith("@$digest", [StringComparison]::Ordinal) }).Count -gt 0) {
-      throw "$($deployment.metadata.name) runtime image digest does not match the ECR artifact."
-    }
-    Write-Host "$($deployment.metadata.name) artifact verified: ${repository}:$Tag ECR=$digest runtime=$($imageIds -join ',')"
-  }
-}
+. (Join-Path $PSScriptRoot 'artifact-contract.ps1')
 
 function Wait-Deployment([string]$Name) {
   & kubectl @kubectlContext -n $Namespace wait --for=condition=Available "deployment/$Name" --timeout="${TimeoutSeconds}s"

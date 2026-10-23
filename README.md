@@ -1,5 +1,11 @@
 # TechX Chart
 
+Staging Deployments now render the digests in `values-staging.yaml`, verified
+against `releases/staging.json`. Local values continue to use local image tags.
+Artifact acceptance checks the manifest, immutable ECR tag/digest, completed
+HIGH/CRITICAL scan gate and runtime image IDs. GitOps still requires main branch
+protection; workflow files alone do not establish required checks or reviewers.
+
 Helm and Argo CD configuration for the TechX internship thin slice. The chart
 owns exactly three restricted workloads. In the domain/VPN profile, the
 frontend and Argo CD share one internal ALB while Catalog and Order remain

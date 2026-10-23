@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import collections
+import json
 import pathlib
 import sys
 
@@ -26,6 +27,8 @@ require(len(by_kind["Ingress"]) == 1, "expected exactly one Ingress")
 require(not by_kind["Secret"], "chart must not render a Secret")
 
 expected = {"frontend", "catalog-api", "order-api"}
+release = json.loads((pathlib.Path(__file__).parents[1] / "releases/staging.json").read_text(encoding="utf-8-sig"))
+artifacts = {entry["component"]: entry for entry in release["images"]}
 for kind in ("Deployment", "Service", "ServiceAccount"):
     require({item["metadata"]["name"] for item in by_kind[kind]} == expected, f"unexpected {kind} set")
 
@@ -69,6 +72,9 @@ for deployment in by_kind["Deployment"]:
     spec = deployment["spec"]
     pod = spec["template"]["spec"]
     container = pod["containers"][0]
+    component = {"catalog-api": "catalog", "order-api": "order"}.get(name, name)
+    artifact = artifacts[component]
+    require(container["image"] == artifact["image"].rsplit(":", 1)[0] + "@" + artifact["digest"], f"{name} must match the release digest")
     require(pod["automountServiceAccountToken"] is (name == "order-api"), f"{name} pod token setting mismatch")
     require(pod["securityContext"]["runAsNonRoot"] is True, f"{name} must run non-root")
     require(container["securityContext"]["readOnlyRootFilesystem"] is True, f"{name} root fs must be read-only")

@@ -6,10 +6,12 @@ workloads:
     image:
       repository: 058114477594.dkr.ecr.us-east-1.amazonaws.com/techx/frontend
       tag: staging-9631c06daaa8
+      digest: sha256:7ee52412e3e54da1f749f6d29c92245b7bba69efe975bf6761604ad1f5a2154c
   catalog-api:
     image:
       repository: 058114477594.dkr.ecr.us-east-1.amazonaws.com/techx/catalog
       tag: staging-9631c06daaa8
+      digest: sha256:152fa4f10ec8d1acbcb7d400922315ef47d8d9aecbdae2c6b3caeced6f26cd9e
   order-api:
     serviceAccountAnnotations:
       eks.amazonaws.com/role-arn: arn:aws:iam::058114477594:role/techx-staging-order-api
@@ -18,6 +20,7 @@ workloads:
     image:
       repository: 058114477594.dkr.ecr.us-east-1.amazonaws.com/techx/order
       tag: staging-9631c06daaa8
+      digest: sha256:041dfbc6ec7ed91d1e9f787e7b00fd625c0c4d6d1b3d3cb08289954fc3355a56
     env:
       AWS_REGION: us-east-1
       AWS_STS_REGIONAL_ENDPOINTS: regional

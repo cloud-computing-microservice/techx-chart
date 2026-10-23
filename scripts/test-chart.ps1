@@ -43,6 +43,7 @@ try {
   $negativeCases = @(
     @('--set-string', 'workloads.frontend.image.tag=latest'),
     @('--set-string', 'workloads.frontend.image.tag='),
+    @('--set-string', 'workloads.frontend.image.digest=sha256:invalid'),
     @('--set-string', 'workloads.catalog-api.port=80'),
     @('--set-string', 'workloads.order-api.resources.limits.memory=invalid')
   )

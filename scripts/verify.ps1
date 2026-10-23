@@ -29,6 +29,7 @@ foreach ($marker in @(
 }
 
 & (Join-Path $PSScriptRoot 'test-chart.ps1')
+& (Join-Path $PSScriptRoot 'test-artifact-contract.ps1')
 & (Join-Path $PSScriptRoot 'evidence-audit.ps1')
 & (Join-Path $PSScriptRoot 'test-local-cleanup.ps1')
 

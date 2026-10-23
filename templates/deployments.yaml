@@ -39,7 +39,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: {{ $name }}
-          image: {{ printf "%s:%s" $config.image.repository $config.image.tag | quote }}
+          image: {{ include "techx.image" $config.image | quote }}
           imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
           securityContext:
             allowPrivilegeEscalation: false
