@@ -2,3 +2,5 @@
 *.log
 rendered/
 .local-k8s-diagnostic.log
+__pycache__/
+*.py[cod]
