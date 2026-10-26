@@ -1,0 +1,13 @@
+name: Observe chart review
+on:
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+permissions: {}
+jobs:
+  observe:
+    if: vars.LIFECYCLE_ENABLED == 'true' && github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.event.pull_request.head.ref, 'release/bootstrap-staging-')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    steps:
+      - name: Signal completion without checking out PR code or reading secrets
+        run: 'true'

@@ -1,0 +1,45 @@
+name: Notify admitted staging of chart events
+on:
+  workflow_run:
+    workflows: [Verify chart, Observe chart review]
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: chart-callback-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+jobs:
+  notify:
+    if: vars.LIFECYCLE_ENABLED == 'true' && github.ref == 'refs/heads/main' && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    # Put the App key in this main-only environment, never a repository secret
+    # available to PR/review workflows. This job executes only default-branch code.
+    environment: staging-chart-notify
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify actual default-branch callback and completed source run
+        id: prepare
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/notify-lifecycle.py prepare
+      - name: Create infra-only notification token
+        id: app
+        if: steps.prepare.outputs.notify == 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+        with:
+          app-id: ${{ vars.LIFECYCLE_APP_ID }}
+          private-key: ${{ secrets.LIFECYCLE_APP_PRIVATE_KEY }}
+          owner: cloud-computing-microservice
+          repositories: techx-infra
+          permission-actions: write
+      - name: Revalidate and send only the actual chart run ID
+        if: steps.prepare.outputs.notify == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LIFECYCLE_APP_TOKEN: ${{ steps.app.outputs.token }}
+        run: python scripts/notify-lifecycle.py send
