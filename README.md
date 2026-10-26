@@ -21,6 +21,38 @@ contracts:
 ./scripts/verify.ps1
 ```
 
+## Admitted lifecycle notifications (source only)
+
+`post-deploy.yml` is currently a cloud-free wakeup, not deployment acceptance.
+It runs from protected default-branch code after `Verify chart` or the minimal
+`Observe chart review` workflow completes. The review signal has no checkout,
+App key, artifacts or AWS access. Candidate CI and human approval remain
+independent requirements; a review notification cannot substitute for CI.
+
+The callback re-reads its actual main run and completed source with a read-only
+chart token. It mints an infra-only Actions token and sends only `chart_run_id`
+to `staging-orchestrate.yml`. Infra derives the current session from its private
+pointer and checks the immutable proposal, actual run, PR head/base/branch and
+time window. It ignores unrelated/stale/fork/closed-session hints, then observes
+the latest real CI/review. Neither a supplied conclusion nor a delayed failed
+run can authorize promotion or override newer evidence. Notifications make one
+POST attempt; an uncertain response is not blindly retried. AWS cleanup remains
+independent of GitHub delivery.
+
+Configure a **main-only** `staging-chart-notify` environment and store
+`LIFECYCLE_APP_PRIVATE_KEY` only as its environment secret, not as a chart
+repository secret accessible to PR workflows. `LIFECYCLE_APP_ID` must identify
+the separately configured Lifecycle App; its selected installation needs Actions
+write on infra. The minted callback token requests only `techx-infra`. Do not
+enable `LIFECYCLE_ENABLED` before the infra recipient, App setup, opening
+preflights and live lifecycle/cancel/queue/cleanup gates are accepted.
+
+GitHub's [workflow event reference](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)
+documents default-branch `workflow_run` execution and PR merge refs for review
+events. This callback never checks out a source PR, consumes its artifacts or
+uses its code while holding the App key. Private acceptance, READY releases,
+rollback and live delivery/permission acceptance remain unfinished.
+
 The local overlay keeps production-like Deployments, Services, probes,
 resources, security contexts, Secret references, and NetworkPolicies while
 disabling the AWS-specific Ingress. It uses the Phase 4 images already built

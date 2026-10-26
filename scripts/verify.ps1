@@ -32,6 +32,8 @@ foreach ($marker in @(
 & (Join-Path $PSScriptRoot 'test-artifact-contract.ps1')
 & (Join-Path $PSScriptRoot 'evidence-audit.ps1')
 & (Join-Path $PSScriptRoot 'test-local-cleanup.ps1')
+python (Join-Path $PSScriptRoot 'test-notify-lifecycle.py')
+if ($LASTEXITCODE -ne 0) { throw 'Chart default-branch callback boundary tests failed.' }
 
 $forbidden = git ls-files | Select-String -Pattern '(^|/)(\.env$|rendered/)|\.(tfstate|tfplan)$'
 if ($forbidden) {
